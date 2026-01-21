@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model branches {
+  id         Int       @id @default(autoincrement())
+  name       String    @db.VarChar(100)
+  location   String?   @db.VarChar(150)
+  created_at DateTime  @default(now()) @db.Timestamp(0)
+  clients    clients[]
+  users      users[]
+}
+
+model clients {
+  id              Int      @id @default(autoincrement())
+  branch_id       Int
+  loan_officer_id Int
+  full_name       String   @db.VarChar(100)
+  phone           String?  @db.VarChar(20)
+  national_id     String?  @db.VarChar(50)
+  address         String?  @db.VarChar(255)
+  created_at      DateTime @default(now()) @db.Timestamp(0)
+  branches        branches @relation(fields: [branch_id], references: [id], onUpdate: Restrict, map: "clients_ibfk_1")
+  users           users    @relation(fields: [loan_officer_id], references: [id], onUpdate: Restrict, map: "clients_ibfk_2")
+  loans           loans[]
+
+  @@index([branch_id], map: "branch_id")
+  @@index([loan_officer_id], map: "loan_officer_id")
+}
+
+model loans {
+  id              Int           @id @default(autoincrement())
+  client_id       Int
+  loan_officer_id Int
+  amount          Decimal       @db.Decimal(12, 2)
+  interest_rate   Decimal       @db.Decimal(5, 2)
+  total_payable   Decimal       @db.Decimal(12, 2)
+  start_date      DateTime      @db.Date
+  due_date        DateTime      @db.Date
+  status          loans_status? @default(ACTIVE)
+  created_at      DateTime      @default(now()) @db.Timestamp(0)
+  clients         clients       @relation(fields: [client_id], references: [id], onUpdate: Restrict, map: "loans_ibfk_1")
+  users           users         @relation(fields: [loan_officer_id], references: [id], onUpdate: Restrict, map: "loans_ibfk_2")
+  repayments      repayments[]
+  visits          visits[]
+
+  @@index([client_id], map: "client_id")
+  @@index([loan_officer_id], map: "loan_officer_id")
+}
+
+model repayments {
+  id           Int      @id @default(autoincrement())
+  loan_id      Int
+  amount       Decimal  @db.Decimal(12, 2)
+  payment_date DateTime @db.Date
+  recorded_by  Int
+  created_at   DateTime @default(now()) @db.Timestamp(0)
+  loans        loans    @relation(fields: [loan_id], references: [id], onUpdate: Restrict, map: "repayments_ibfk_1")
+  users        users    @relation(fields: [recorded_by], references: [id], onUpdate: Restrict, map: "repayments_ibfk_2")
+
+  @@index([loan_id], map: "loan_id")
+  @@index([recorded_by], map: "recorded_by")
+}
+
+model users {
+  id            Int          @id @default(autoincrement())
+  branch_id     Int?
+  full_name     String       @db.VarChar(100)
+  email         String       @unique(map: "email") @db.VarChar(100)
+  phone         String?      @db.VarChar(20)
+  password_hash String       @db.VarChar(255)
+  role          users_role
+  is_active     Boolean?     @default(true)
+  created_at    DateTime     @default(now()) @db.Timestamp(0)
+  clients       clients[]
+  loans         loans[]
+  repayments    repayments[]
+  branches      branches?    @relation(fields: [branch_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "users_ibfk_1")
+  visits        visits[]
+
+  @@index([branch_id], map: "branch_id")
+}
+
+model visits {
+  id              Int      @id @default(autoincrement())
+  loan_id         Int
+  loan_officer_id Int
+  visit_date      DateTime @db.Date
+  notes           String?  @db.Text
+  next_action     String?  @db.VarChar(255)
+  created_at      DateTime @default(now()) @db.Timestamp(0)
+  loans           loans    @relation(fields: [loan_id], references: [id], onUpdate: Restrict, map: "visits_ibfk_1")
+  users           users    @relation(fields: [loan_officer_id], references: [id], onUpdate: Restrict, map: "visits_ibfk_2")
+
+  @@index([loan_id], map: "loan_id")
+  @@index([loan_officer_id], map: "loan_officer_id")
+}
+
+enum users_role {
+  ADMIN
+  BRANCH_MANAGER
+  LOAN_OFFICER
+}
+
+enum loans_status {
+  ACTIVE
+  COMPLETED
+  DEFAULTED
+}
